@@ -126,8 +126,6 @@ export class SearchStack extends cdk.Stack {
       );
 
       fineGrainedAccessControl = {
-        enabled: true,
-        internalUserDatabaseEnabled: true,
         masterUserName: masterSecret.secretValueFromJson("username").unsafeUnwrap(),
         masterUserPassword: masterSecret.secretValueFromJson("password"),
       };
