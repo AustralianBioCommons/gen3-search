@@ -34,8 +34,8 @@ export interface StageConfig {
 
 export interface NetworkLookupConfig {
   envKey?: string;
-  vpcIdParameterName?: string;
-  privateSubnetIdsParameterName?: string;
+  vpcId?: string;
+  privateSubnetIds?: string[];
   vpcCidr?: string;
   availabilityZones?: string[];
 }

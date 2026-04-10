@@ -42,15 +42,33 @@ export class SearchStack extends cdk.Stack {
       props.networkLookup.privateSubnetIdsParameterName
     );
 
-    const subnets = subnetIds.map((subnetId, index) =>
-      ec2.Subnet.fromSubnetId(this, `ImportedSubnet${index}`, subnetId)
-    );
+    // Note: Do NOT pass privateSubnetIds to fromVpcAttributes — CDK validates
+    // that count is a multiple of AZ count at synth time, but SSM token arrays
+    // have synthetic length (1) regardless of actual subnet count, causing:
+    //   «MustBeNumberMultipleAvailability» Number of privateSubnetIds (1)
+    //   must be a multiple of availability zones (N).
+    // Instead, construct ISubnet objects directly and pass them via vpcSubnets.
+    //
+    // Pass only as many AZs as subnets we actually intend to use.
+    // With zoneAwareness disabled (single-node), OpenSearch uses 1 subnet;
+    // with it enabled, use the configured availabilityZoneCount.
+    // The placeholder AZ names are fine — CDK only needs the count here;
+    // actual AZ assignment is driven by the explicit subnets in vpcSubnets.
+    const zoneAwarenessEnabled = props.search.zoneAwareness.enabled;
+    const zoneCount = zoneAwarenessEnabled
+      ? props.search.zoneAwareness.availabilityZoneCount
+      : 1;
+    const placeholderAzs = props.networkLookup.availabilityZones.slice(0, zoneCount);
 
     const vpc = ec2.Vpc.fromVpcAttributes(this, "Vpc", {
       vpcId,
-      availabilityZones: props.networkLookup.availabilityZones,
-      privateSubnetIds: subnetIds,
+      availabilityZones: placeholderAzs,
     });
+
+    // Take only as many subnets as the zone count — one subnet per AZ.
+    const subnets = subnetIds.slice(0, zoneCount).map((subnetId, index) =>
+      ec2.Subnet.fromSubnetId(this, `ImportedSubnet${index}`, subnetId)
+    );
 
     const securityGroup = new ec2.SecurityGroup(this, "SearchSecurityGroup", {
       vpc,
@@ -150,7 +168,11 @@ export class SearchStack extends cdk.Stack {
       },
       zoneAwareness: {
         enabled: props.search.zoneAwareness.enabled,
-        availabilityZoneCount: props.search.zoneAwareness.availabilityZoneCount,
+        // availabilityZoneCount must be omitted when zoneAwareness is disabled —
+        // CDK throws if you pass it alongside enabled: false.
+        ...(props.search.zoneAwareness.enabled
+          ? { availabilityZoneCount: props.search.zoneAwareness.availabilityZoneCount }
+          : {}),
       },
       enforceHttps: props.search.encryption.enforceHttps,
       nodeToNodeEncryption: props.search.encryption.nodeToNodeEncryptionEnabled,
