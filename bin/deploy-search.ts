@@ -12,10 +12,25 @@ if (!configPath) {
 
 const config = loadAppConfig(configPath);
 
+cdk.Tags.of(app).add("Project", config.project);
+cdk.Tags.of(app).add("Application", config.application);
+
+if (config.owner) {
+  cdk.Tags.of(app).add("Owner", config.owner);
+}
+
+for (const [key, value] of Object.entries(config.tags ?? {})) {
+  cdk.Tags.of(app).add(key, value);
+}
+
 for (const stageConfig of config.stages) {
   const resolved = resolveStageConfig(config, stageConfig);
 
-  new SearchStack(app, `${stageConfig.id}Search`, {
+  if (!resolved.search.enabled) {
+    continue;
+  }
+
+  const stack = new SearchStack(app, `${stageConfig.id}Search`, {
     env: {
       account: resolved.envTarget.account,
       region: resolved.envTarget.region,
@@ -29,4 +44,8 @@ for (const stageConfig of config.stages) {
     networkLookup: resolved.networkLookup,
     search: resolved.search,
   });
+
+  cdk.Tags.of(stack).add("Project", config.project);
+  cdk.Tags.of(stack).add("Application", config.application);
+  cdk.Tags.of(stack).add("Environment", resolved.envTarget.name);
 }

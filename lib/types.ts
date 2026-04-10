@@ -36,6 +36,7 @@ export interface NetworkLookupConfig {
   envKey?: string;
   vpcIdParameterName?: string;
   privateSubnetIdsParameterName?: string;
+  vpcCidr?: string;
 }
 
 export interface SearchConfig {

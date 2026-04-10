@@ -39,15 +39,27 @@ export class SearchStack extends cdk.Stack {
     const envName = props.envTarget.name;
     const qualifiedName = `${props.namePrefix}-${envName}`;
 
-    const vpcId = ssm.StringParameter.valueForStringParameter(this, props.networkLookup.vpcIdParameterName);
-    const subnetIds = parseSubnetIds(
-      ssm.StringParameter.valueForStringParameter(this, props.networkLookup.privateSubnetIdsParameterName)
+    const vpcId = ssm.StringParameter.valueForStringParameter(
+      this,
+      props.networkLookup.vpcIdParameterName
     );
 
-    const vpc = ec2.Vpc.fromLookup(this, "Vpc", { vpcId });
+    const subnetIds = parseSubnetIds(
+      ssm.StringParameter.valueForStringParameter(
+        this,
+        props.networkLookup.privateSubnetIdsParameterName
+      )
+    );
+
     const subnets = subnetIds.map((subnetId, index) =>
       ec2.Subnet.fromSubnetId(this, `ImportedSubnet${index}`, subnetId)
     );
+
+    const vpc = ec2.Vpc.fromVpcAttributes(this, "Vpc", {
+      vpcId,
+      availabilityZones: cdk.Stack.of(this).availabilityZones,
+      privateSubnetIds: subnetIds,
+    });
 
     const securityGroup = new ec2.SecurityGroup(this, "SearchSecurityGroup", {
       vpc,
@@ -55,7 +67,11 @@ export class SearchStack extends cdk.Stack {
       description: `Security group for ${qualifiedName} OpenSearch domain`,
     });
 
-    securityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(443), "Allow HTTPS from within VPC");
+    securityGroup.addIngressRule(
+      ec2.Peer.ipv4(props.networkLookup.vpcCidr),
+      ec2.Port.tcp(443),
+      "Allow HTTPS from within VPC"
+    );
 
     const logging: opensearch.LoggingOptions = {
       ...(props.search.logging.appLogEnabled
@@ -67,7 +83,6 @@ export class SearchStack extends cdk.Stack {
           }),
         }
         : {}),
-
       ...(props.search.logging.slowSearchLogEnabled
         ? {
           slowSearchLogEnabled: true,
@@ -77,7 +92,6 @@ export class SearchStack extends cdk.Stack {
           }),
         }
         : {}),
-
       ...(props.search.logging.slowIndexLogEnabled
         ? {
           slowIndexLogEnabled: true,
@@ -87,7 +101,6 @@ export class SearchStack extends cdk.Stack {
           }),
         }
         : {}),
-
       ...(props.search.logging.auditLogEnabled
         ? {
           auditLogEnabled: true,
@@ -99,13 +112,11 @@ export class SearchStack extends cdk.Stack {
         : {}),
     };
 
-    let fineGrainedAccessControl:
-      | opensearch.AdvancedSecurityOptions
-      | undefined;
+    let fineGrainedAccessControl: opensearch.AdvancedSecurityOptions | undefined;
 
     if (props.search.fineGrainedAccess.enabled) {
       if (!props.search.fineGrainedAccess.masterUserNameSecretName) {
-        throw new Error("fineGrainedAccess.masterUserNameSecretName is required when fine-grained access is enabled");
+        throw new Error("fineGrainedAccess.masterUserNameSecretName is required when enabled");
       }
 
       const masterSecret = secretsmanager.Secret.fromSecretNameV2(
@@ -115,7 +126,9 @@ export class SearchStack extends cdk.Stack {
       );
 
       fineGrainedAccessControl = {
-        masterUserName: masterSecret.secretValueFromJson("username").toString(),
+        enabled: true,
+        internalUserDatabaseEnabled: true,
+        masterUserName: masterSecret.secretValueFromJson("username").unsafeUnwrap(),
         masterUserPassword: masterSecret.secretValueFromJson("password"),
       };
     }
@@ -128,7 +141,9 @@ export class SearchStack extends cdk.Stack {
         dataNodeInstanceType: props.search.capacity.dataNodeInstanceType,
         masterNodes: props.search.capacity.masterNodes > 0 ? props.search.capacity.masterNodes : undefined,
         masterNodeInstanceType:
-          props.search.capacity.masterNodes > 0 ? props.search.capacity.masterNodeInstanceType : undefined,
+          props.search.capacity.masterNodes > 0
+            ? props.search.capacity.masterNodeInstanceType
+            : undefined,
         warmNodes: props.search.capacity.warmNodes > 0 ? props.search.capacity.warmNodes : undefined,
         warmInstanceType:
           props.search.capacity.warmNodes > 0 ? props.search.capacity.warmInstanceType : undefined,
@@ -137,8 +152,12 @@ export class SearchStack extends cdk.Stack {
         enabled: props.search.ebs.enabled,
         volumeSize: props.search.ebs.volumeSize,
         volumeType: resolveEbsVolumeType(props.search.ebs.volumeType),
-        iops: props.search.ebs.volumeType === "IO1" || props.search.ebs.volumeType === "GP3" ? props.search.ebs.iops : undefined,
-        throughput: props.search.ebs.volumeType === "GP3" ? props.search.ebs.throughput : undefined,
+        iops:
+          props.search.ebs.volumeType === "IO1" || props.search.ebs.volumeType === "GP3"
+            ? props.search.ebs.iops
+            : undefined,
+        throughput:
+          props.search.ebs.volumeType === "GP3" ? props.search.ebs.throughput : undefined,
       },
       zoneAwareness: {
         enabled: props.search.zoneAwareness.enabled,

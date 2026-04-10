@@ -4,7 +4,6 @@ import * as cdk from "aws-cdk-lib";
 import * as opensearch from "aws-cdk-lib/aws-opensearchservice";
 import {
   AppConfig,
-  EbsConfig,
   EnvironmentTarget,
   ResolvedSearchConfig,
   ResolvedStageConfig,
@@ -15,8 +14,7 @@ import { validateConfig } from "./schema";
 
 export function loadAppConfig(configPath: string): AppConfig {
   const absolutePath = path.resolve(configPath);
-  const raw = fs.readFileSync(absolutePath, "utf8");
-  const config = JSON.parse(raw) as AppConfig;
+  const config = JSON.parse(fs.readFileSync(absolutePath, "utf8")) as AppConfig;
   validateConfig(config);
   return config;
 }
@@ -43,40 +41,30 @@ function resolveRemovalPolicy(value?: string): cdk.RemovalPolicy {
   }
 }
 
-function resolveEngineVersion(value?: string): opensearch.EngineVersion {
-  switch ((value ?? "OPENSEARCH_2_17").toUpperCase()) {
-    case "OPENSEARCH_2_19":
-      return opensearch.EngineVersion.OPENSEARCH_2_19;
-    case "OPENSEARCH_2_17":
+function resolveEngineVersion(value: string): opensearch.EngineVersion {
+  switch (value) {
+    case "OpenSearch_2_17":
       return opensearch.EngineVersion.OPENSEARCH_2_17;
-    case "OPENSEARCH_2_15":
+    case "OpenSearch_2_15":
       return opensearch.EngineVersion.OPENSEARCH_2_15;
-    case "OPENSEARCH_2_13":
+    case "OpenSearch_2_13":
       return opensearch.EngineVersion.OPENSEARCH_2_13;
+    case "OpenSearch_2_11":
+      return opensearch.EngineVersion.OPENSEARCH_2_11;
+    case "OpenSearch_2_9":
+      return opensearch.EngineVersion.OPENSEARCH_2_9;
     default:
       throw new Error(`Unsupported engine version: ${value}`);
   }
 }
 
-function resolveEbsDefaults(ebs?: EbsConfig): Required<EbsConfig> {
-  return {
-    enabled: ebs?.enabled ?? true,
-    volumeSize: ebs?.volumeSize ?? 100,
-    volumeType: ebs?.volumeType ?? "GP3",
-    iops: ebs?.iops ?? 3000,
-    throughput: ebs?.throughput ?? 125,
-  };
-}
+function resolveSearchConfig(search: SearchConfig): ResolvedSearchConfig {
+  if (!search.domainName) throw new Error("search.domainName is required");
+  if (!search.engineVersion) throw new Error("search.engineVersion is required");
 
-function resolveSearchConfig(
-  appConfig: AppConfig,
-  envName: string,
-  search: SearchConfig
-): ResolvedSearchConfig {
-  const ebs = resolveEbsDefaults(search.ebs);
   return {
     enabled: search.enabled,
-    domainName: search.domainName ?? `${appConfig.naming.namePrefix}-${envName}`,
+    domainName: search.domainName,
     engineVersion: resolveEngineVersion(search.engineVersion),
     capacity: {
       dataNodes: search.capacity.dataNodes,
@@ -86,9 +74,15 @@ function resolveSearchConfig(
       warmNodes: search.capacity.warmNodes ?? 0,
       warmInstanceType: search.capacity.warmInstanceType ?? "",
     },
-    ebs,
+    ebs: {
+      enabled: search.ebs.enabled,
+      volumeSize: search.ebs.volumeSize,
+      volumeType: search.ebs.volumeType ?? "GP3",
+      iops: search.ebs.iops ?? 3000,
+      throughput: search.ebs.throughput ?? 125,
+    },
     zoneAwareness: {
-      enabled: search.zoneAwareness?.enabled ?? true,
+      enabled: search.zoneAwareness?.enabled ?? false,
       availabilityZoneCount: search.zoneAwareness?.availabilityZoneCount ?? 2,
     },
     encryption: {
@@ -101,9 +95,9 @@ function resolveSearchConfig(
       masterUserNameSecretName: search.fineGrainedAccess?.masterUserNameSecretName ?? "",
     },
     logging: {
-      appLogEnabled: search.logging?.appLogEnabled ?? true,
-      slowSearchLogEnabled: search.logging?.slowSearchLogEnabled ?? true,
-      slowIndexLogEnabled: search.logging?.slowIndexLogEnabled ?? true,
+      appLogEnabled: search.logging?.appLogEnabled ?? false,
+      slowSearchLogEnabled: search.logging?.slowSearchLogEnabled ?? false,
+      slowIndexLogEnabled: search.logging?.slowIndexLogEnabled ?? false,
       auditLogEnabled: search.logging?.auditLogEnabled ?? false,
     },
     accessPolicies: search.accessPolicies ?? [],
@@ -111,27 +105,20 @@ function resolveSearchConfig(
   };
 }
 
-export function resolveStageConfig(
-  appConfig: AppConfig,
-  stage: StageConfig
-): ResolvedStageConfig {
+export function resolveStageConfig(appConfig: AppConfig, stage: StageConfig): ResolvedStageConfig {
   const envTarget = resolveEnvironmentTarget(appConfig.environments, stage.envKey);
-  const networkEnvKey = stage.networkLookup.envKey ?? stage.envKey;
 
   return {
     id: stage.id,
     stageName: stage.stageName,
     envTarget,
     networkLookup: {
-      envKey: networkEnvKey,
-      vpcIdParameterName:
-        stage.networkLookup.vpcIdParameterName ??
-        `${appConfig.naming.ssmPrefix}/${appConfig.project}/${appConfig.application}/${networkEnvKey}/vpc-id`,
-      privateSubnetIdsParameterName:
-        stage.networkLookup.privateSubnetIdsParameterName ??
-        `${appConfig.naming.ssmPrefix}/${appConfig.project}/${appConfig.application}/${networkEnvKey}/private-subnet-ids`,
+      envKey: stage.networkLookup.envKey ?? stage.envKey,
+      vpcIdParameterName: stage.networkLookup.vpcIdParameterName!,
+      privateSubnetIdsParameterName: stage.networkLookup.privateSubnetIdsParameterName!,
+      vpcCidr: stage.networkLookup.vpcCidr!,
     },
-    search: resolveSearchConfig(appConfig, envTarget.name, stage.search),
+    search: resolveSearchConfig(stage.search),
     requireManualApproval: stage.approvals?.requireManualApproval ?? false,
   };
 }
