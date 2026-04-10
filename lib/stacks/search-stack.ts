@@ -142,6 +142,11 @@ export class SearchStack extends cdk.Stack {
         masterUserPassword: masterSecret.secretValueFromJson("password"),
       };
     }
+    // Ensure the OpenSearch service-linked role exists.
+    // This is a no-op if it already exists in the account.
+    new iam.CfnServiceLinkedRole(this, "OpenSearchServiceLinkedRole", {
+      awsServiceName: "opensearchservice.amazonaws.com",
+    });
 
     this.domain = new opensearch.Domain(this, "Domain", {
       domainName: props.search.domainName,
