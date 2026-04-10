@@ -37,6 +37,7 @@ export interface NetworkLookupConfig {
   vpcIdParameterName?: string;
   privateSubnetIdsParameterName?: string;
   vpcCidr?: string;
+  availabilityZones?: string[];
 }
 
 export interface SearchConfig {

@@ -44,11 +44,9 @@ export class SearchStack extends cdk.Stack {
       props.networkLookup.vpcIdParameterName
     );
 
-    const subnetIds = parseSubnetIds(
-      ssm.StringParameter.valueForStringParameter(
-        this,
-        props.networkLookup.privateSubnetIdsParameterName
-      )
+    const subnetIds = ssm.StringListParameter.valueForTypedListParameter(
+      this,
+      props.networkLookup.privateSubnetIdsParameterName
     );
 
     const subnets = subnetIds.map((subnetId, index) =>
@@ -57,7 +55,7 @@ export class SearchStack extends cdk.Stack {
 
     const vpc = ec2.Vpc.fromVpcAttributes(this, "Vpc", {
       vpcId,
-      availabilityZones: cdk.Stack.of(this).availabilityZones,
+      availabilityZones: props.networkLookup.availabilityZones,
       privateSubnetIds: subnetIds,
     });
 
