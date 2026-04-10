@@ -1,0 +1,72 @@
+{
+  "project": "sample",
+  "application": "gen3",
+  "owner": "Platform",
+  "naming": {
+    "namePrefix": "sample-gen3",
+    "ssmPrefix": "/platform",
+    "secretPrefix": "platform"
+  },
+  "environments": {
+    "uat": {
+      "name": "uat",
+      "account": "111111111111",
+      "region": "ap-southeast-2"
+    },
+    "prod": {
+      "name": "prod",
+      "account": "222222222222",
+      "region": "ap-southeast-2"
+    }
+  },
+  "stages": [
+    {
+      "id": "SampleSearchUat",
+      "stageName": "UAT",
+      "envKey": "uat",
+      "networkLookup": {
+        "envKey": "uat"
+      },
+      "search": {
+        "enabled": true,
+        "engineVersion": "OPENSEARCH_2_17",
+        "capacity": {
+          "dataNodes": 2,
+          "dataNodeInstanceType": "t3.small.search"
+        },
+        "ebs": {
+          "enabled": true,
+          "volumeSize": 50,
+          "volumeType": "GP3"
+        },
+        "zoneAwareness": {
+          "enabled": true,
+          "availabilityZoneCount": 2
+        },
+        "encryption": {
+          "atRestEnabled": true,
+          "nodeToNodeEncryptionEnabled": true,
+          "enforceHttps": true
+        },
+        "logging": {
+          "appLogEnabled": true,
+          "slowSearchLogEnabled": true,
+          "slowIndexLogEnabled": true,
+          "auditLogEnabled": false
+        },
+        "accessPolicies": [
+          {
+            "effect": "ALLOW",
+            "principals": [
+              "arn:aws:iam::111111111111:role/sample-app-uat"
+            ],
+            "actions": [
+              "es:ESHttp*"
+            ]
+          }
+        ],
+        "removalPolicy": "RETAIN"
+      }
+    }
+  ]
+}
