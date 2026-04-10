@@ -8,13 +8,6 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { SearchStackProps } from "../types";
 
-function parseSubnetIds(value: string): string[] {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-}
-
 function resolveEbsVolumeType(value: string): ec2.EbsDeviceVolumeType {
   switch (value) {
     case "GP2":

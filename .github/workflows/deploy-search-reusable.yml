@@ -107,6 +107,10 @@ jobs:
             config.environments[key] = env;
           }
 
+          if (!config.environments || !config.environments[targetEnv]) {
+            throw new Error(`No environment found for envKey='${targetEnv}'`);
+          }
+
           config.stages = (config.stages || []).filter(
             (stage) => stage.envKey === targetEnv
           );

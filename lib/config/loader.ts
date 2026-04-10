@@ -117,6 +117,7 @@ export function resolveStageConfig(appConfig: AppConfig, stage: StageConfig): Re
       vpcIdParameterName: stage.networkLookup.vpcIdParameterName!,
       privateSubnetIdsParameterName: stage.networkLookup.privateSubnetIdsParameterName!,
       vpcCidr: stage.networkLookup.vpcCidr!,
+      availabilityZones: stage.networkLookup.availabilityZones!,
     },
     search: resolveSearchConfig(stage.search),
     requireManualApproval: stage.approvals?.requireManualApproval ?? false,

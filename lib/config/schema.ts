@@ -34,10 +34,14 @@ export function validateConfig(config: AppConfig): void {
     if (!stage.networkLookup?.vpcCidr) {
       throw new Error(`stage ${stage.id}: networkLookup.vpcCidr is required`);
     }
+    if (!stage.networkLookup?.availabilityZones || stage.networkLookup.availabilityZones.length === 0) {
+      throw new Error(`stage ${stage.id}: networkLookup.availabilityZones is required`);
+    }
 
     if (!stage.search) {
       throw new Error(`stage ${stage.id}: search is required`);
     }
+
     if (stage.search.enabled) {
       if (!stage.search.domainName) {
         throw new Error(`stage ${stage.id}: search.domainName is required`);

@@ -104,11 +104,19 @@ export interface ApprovalConfig {
   requireManualApproval?: boolean;
 }
 
+export interface ResolvedNetworkLookupConfig {
+  envKey: string;
+  vpcIdParameterName: string;
+  privateSubnetIdsParameterName: string;
+  vpcCidr: string;
+  availabilityZones: string[];
+}
+
 export interface ResolvedStageConfig {
   id: string;
   stageName: string;
   envTarget: EnvironmentTarget;
-  networkLookup: Required<NetworkLookupConfig>;
+  networkLookup: ResolvedNetworkLookupConfig;
   search: ResolvedSearchConfig;
   requireManualApproval: boolean;
 }
@@ -137,6 +145,6 @@ export interface BaseNamingProps {
 
 export interface SearchStackProps extends cdk.StackProps, BaseNamingProps {
   envTarget: EnvironmentTarget;
-  networkLookup: Required<NetworkLookupConfig>;
+  networkLookup: ResolvedNetworkLookupConfig;
   search: ResolvedSearchConfig;
 }
