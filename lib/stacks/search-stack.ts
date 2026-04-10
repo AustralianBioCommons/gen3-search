@@ -37,23 +37,22 @@ export class SearchStack extends cdk.Stack {
       props.networkLookup.vpcIdParameterName
     );
 
-    const subnetIds = ssm.StringListParameter.valueForTypedListParameter(
+    // valueForTypedListParameter emits CFN type AWS::SSM::Parameter::Value<List<String>>,
+    // which CFN rejects if the SSM parameter is stored as String (even if comma-separated).
+    // Instead: read as a plain String and use Fn::Split — works for both String and
+    // StringList SSM types, and avoids CFN's type-compatibility validation entirely.
+    const subnetIdsRaw = ssm.StringParameter.valueForStringParameter(
       this,
       props.networkLookup.privateSubnetIdsParameterName
     );
+    const subnetIds = cdk.Fn.split(",", subnetIdsRaw);
 
-    // Note: Do NOT pass privateSubnetIds to fromVpcAttributes — CDK validates
-    // that count is a multiple of AZ count at synth time, but SSM token arrays
-    // have synthetic length (1) regardless of actual subnet count, causing:
-    //   «MustBeNumberMultipleAvailability» Number of privateSubnetIds (1)
-    //   must be a multiple of availability zones (N).
-    // Instead, construct ISubnet objects directly and pass them via vpcSubnets.
-    //
-    // Pass only as many AZs as subnets we actually intend to use.
-    // With zoneAwareness disabled (single-node), OpenSearch uses 1 subnet;
+    // Pass only as many AZs as subnets we intend to use.
+    // With zoneAwareness disabled (single-node), OpenSearch uses 1 subnet/AZ;
     // with it enabled, use the configured availabilityZoneCount.
-    // The placeholder AZ names are fine — CDK only needs the count here;
-    // actual AZ assignment is driven by the explicit subnets in vpcSubnets.
+    // Do NOT pass privateSubnetIds to fromVpcAttributes — CDK validates the count
+    // against availabilityZones at synth time, but token arrays always have length 1,
+    // causing «MustBeNumberMultipleAvailability». Use explicit subnets in vpcSubnets instead.
     const zoneAwarenessEnabled = props.search.zoneAwareness.enabled;
     const zoneCount = zoneAwarenessEnabled
       ? props.search.zoneAwareness.availabilityZoneCount
@@ -65,9 +64,13 @@ export class SearchStack extends cdk.Stack {
       availabilityZones: placeholderAzs,
     });
 
-    // Take only as many subnets as the zone count — one subnet per AZ.
-    const subnets = subnetIds.slice(0, zoneCount).map((subnetId, index) =>
-      ec2.Subnet.fromSubnetId(this, `ImportedSubnet${index}`, subnetId)
+    // Select only the subnets needed (one per AZ) using Fn::Select on the split list.
+    const subnets = Array.from({ length: zoneCount }, (_, index) =>
+      ec2.Subnet.fromSubnetId(
+        this,
+        `ImportedSubnet${index}`,
+        cdk.Fn.select(index, subnetIds)
+      )
     );
 
     const securityGroup = new ec2.SecurityGroup(this, "SearchSecurityGroup", {
