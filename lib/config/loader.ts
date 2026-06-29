@@ -53,6 +53,12 @@ function resolveEngineVersion(value: string): opensearch.EngineVersion {
       return opensearch.EngineVersion.OPENSEARCH_2_11;
     case "OpenSearch_2_9":
       return opensearch.EngineVersion.OPENSEARCH_2_9;
+
+    case "OpenSearch_1_3":
+      return opensearch.EngineVersion.OPENSEARCH_1_3;
+    case "Elasticsearch_7_10":
+      return opensearch.EngineVersion.ELASTICSEARCH_7_10;
+
     default:
       throw new Error(`Unsupported engine version: ${value}`);
   }
